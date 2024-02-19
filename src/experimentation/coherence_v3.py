@@ -132,7 +132,9 @@ class PredictByChainCountExperiment:
         true_string = "".join(map(str,true_labels))
 
         # calculate all the metrics we will be storing
-        
+
+        print(pred_string)
+        print(true_string)
         print(len(pred_string), len(true_string))
         wd_score = windowdiff(pred_string, true_string, avg_k)
         pk_score = pk(pred_string, true_string, avg_k)

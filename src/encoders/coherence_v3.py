@@ -66,8 +66,6 @@ class Coherence:
         G = CoherenceGraph(coherence_threshold=self.coherence_threshold)
         temp_prev_graph = nx.Graph()
         prev_num_chains = 0
-        # add 1 distance to each word
-        G.balance_graph()
 
         # set up batching
         for j, batch_num in enumerate(range(0, len(text_data) // batch_size)):
@@ -98,6 +96,8 @@ class Coherence:
             
             # start iterating over the current batch
             for i, sentence in enumerate(batch_keywords):
+                # add 1 distance to each word
+                G.balance_graph()
                 G.prune_max_depth(max_depth=max_graph_depth)
                 num_chains = 0
                 for word in sentence:
@@ -117,7 +117,7 @@ class Coherence:
                     if j != 0:
                         chains = node.get_unique_chains()
                         num_chains += len(chains)
-                if j == 0:
+                if i == 0 and j == 0:
                     prediction = 1
                     predictions.append(prediction)
                     print(".", end="")
@@ -126,8 +126,8 @@ class Coherence:
                     # if num_chains == 0:
                     #     prediction = 1
                     if prediction == 1: 
-                        G.prune_max_depth(max_depth=1)
-                        prev_num_chains = 0
+                        # G.prune_max_depth(max_depth=1)
+                        prev_num_chains = num_chains
                     else:
                         prev_num_chains = num_chains
 

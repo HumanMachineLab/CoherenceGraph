@@ -153,7 +153,7 @@ class SimpleExperiment:
             )  # get avg segment size
 
             # convert to strings so it can be used with the wd and pk metrics
-            pred_string = "".join(map(str,predictions))
+            pred_string = "".join(map(str,modified_predictions))
             true_string = "".join(map(str,true_labels))
 
             # calculate all the metrics we will be storing

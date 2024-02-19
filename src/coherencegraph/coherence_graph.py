@@ -32,6 +32,7 @@ class CoherenceNode():
         unique_chains = []
 
         prev_nodes = graph.get_nodes_at_distance(self.distance+1)
+        # print([str(n) for n in prev_nodes])
         for node in prev_nodes:
             # print(node.unique_chains)
             for chain in node.unique_chains:
@@ -106,6 +107,10 @@ class CoherenceGraph(nx.Graph):
     # overriden function to add more functionality to the traditional add_edge function
     def add_edge(self, *args, **kwargs):
         super().add_edge(*args, **kwargs)
+    
+    def get_all_nodes(self):
+        nodes = self.adj.items()
+        return [n[0] for n in nodes]
 
     # get a node based on an id
     def get_node_by_id(self, id: str):
@@ -278,7 +283,7 @@ class CoherenceGraph(nx.Graph):
         for node in chain:
             if prev_node is not None:
                 if with_weights:
-                    print(str(prev_node), "--", G.get_edge(prev_node, node)["weight"], "--> ", end="")
+                    print(str(prev_node), "--", self.get_edge(prev_node, node)["weight"], "--> ", end="")
                 else:
                     print(str(prev_node), "--> ", end="")
             prev_node = node
