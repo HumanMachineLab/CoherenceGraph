@@ -103,6 +103,9 @@ class CoherenceGraph(nx.Graph):
     def __init__(self, coherence_threshold):
         nx.Graph.__init__(self)
         self.coherence_threshold = coherence_threshold
+    
+    def empty_graph(self):
+        nx.Graph.__init__(self)
 
     # overriden function to add more functionality to the traditional add_edge function
     def add_edge(self, *args, **kwargs):

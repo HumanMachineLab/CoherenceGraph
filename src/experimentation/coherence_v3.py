@@ -14,6 +14,7 @@ from src.experimentation.prediction_thresholds import thresholds
 from src.experimentation.graphs import display_pk_wd_proximity
 
 from utils.metrics import windowdiff, pk, get_proximity
+import tikzplotlib
 
 
 def get_random_hash(k):
@@ -25,6 +26,13 @@ experiment_set_hash = get_random_hash(
     5
 )  # global hash for all the experiments during this run.
 
+scoring_factors = {
+    "chain_count": [0.1, 0.2, 0.3, 0.4, 0.5, 1, 1.5, 2, 2.5, 3],
+    "weighted_count": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
+}
+
+
+supported_datasets = ["city", "disease", "clinical", "wiki", "fiction", "committee", "product", "academic", "wiki50k", "choi_3_5", "choi_3_11", "choi_6_8", "choi_9_11"]
 
 @dataclass
 class CoherenceExperiment:
@@ -46,15 +54,24 @@ class CoherenceExperiment:
     similar_keywords: bool = True
     ablation: bool = False  # if set to True, remove the coherence map
 
+    # e.g., for weighted_count | if total_similarity < (prev_similarity*(2/4)) predict 1 | where scoring_factor is 2/4
+    # e.g., for chain_count | prediction = 1 if num_chains < (prev_num_chains//2) else 0 | where scoring_factor is 2
+    # recommended -> chain_count=2, 
+    # recommended -> weighted_count=0.5 (lower number will mean less predictions)
+    scoring_factor: float = 0.5 # factor to determine the prediction 
+
     # debugging
-    print_metrics_summary: bool = (False,)
-    print_predictions_summary: bool = (False,)
+    print_metrics_summary: bool = False
+    print_predictions_summary: bool = False
     show_graphs: bool = True
 
 
-class PredictByChainCountExperiment:
-    def __init__(self):
+supported_experiments = ["chain_count", "weighted_count"]
+class Experiment:
+    def __init__(self, type):
         self.experiments = []
+        assert type in supported_experiments, "experiment not supported"
+        self.type = type
 
     def queue_experiment(self, experiment: CoherenceExperiment):
         experiment.experiment_hash = get_random_hash(5)
@@ -65,7 +82,7 @@ class PredictByChainCountExperiment:
 
     # gather all the predictions and store them in a csv.
     def log_predictions(
-        self, experiment: CoherenceExperiment, predictions, true_labels
+        self, experiment: CoherenceExperiment, predictions, scores, true_labels
     ):
         predictions_directory = "{}/predictions/{}".format(
             config.root_path, experiment_set_hash
@@ -84,6 +101,7 @@ class PredictByChainCountExperiment:
 
           # convert pytorch tensor to raw primitive type before storage
         experiment_dict["predictions"] = predictions
+        experiment_dict["scores"] = scores
         experiment_dict["true_labels"] = true_labels
 
         df = pd.json_normalize(experiment_dict)
@@ -91,10 +109,10 @@ class PredictByChainCountExperiment:
         # append data frame to CSV file
         df.to_csv(predictions_path, mode="a", index=False, header=hdr)
 
-        self.log_evaluations(experiment, predictions, true_labels)
+        self.log_evaluations(experiment, predictions, scores, true_labels)
 
     # calculate all the evaluation metrics and store them in a csv file.
-    def log_evaluations(self, experiment, predictions, true_labels):
+    def log_evaluations(self, experiment, predictions, scores, true_labels):
 
         evaluation_directory = "{}/predictions/{}/{}".format(
             config.root_path, experiment_set_hash, experiment.experiment_hash
@@ -115,70 +133,89 @@ class PredictByChainCountExperiment:
             print("============= Metrics Summary =============")
 
         lowest_pk = 1
-        lowest_pred_thresh = 1
+        best_scoring_factor = 1
         best_proximity = 0
         best_overall_score = 1
         best_predictions = None
         pks = []
         wds = []
         proximities = []
+        for scoring_factor in scoring_factors[self.type]:
+            avg_k = len(true_labels) // (
+                true_labels.count(1) + 1
+            )  # get avg segment size
 
-        avg_k = len(true_labels) // (
-            true_labels.count(1) + 1
-        )  # get avg segment size
+            new_predictions = []
+            # rebuild the predictions based on the scoring factors
+            for i, score in enumerate(scores):
+                if self.type == "chain_count":
+                    if score == -1:
+                        new_predictions.append(1)
+                    else:
+                        prev_score = scores[i-1]
+                        # print(prev_score, score)
+                        new_predictions.append(1 if score < (prev_score//(scoring_factor)) else 0)
+                elif self.type == "weighted_count":
+                    if score == -1:
+                        new_predictions.append(1)
+                    else:
+                        prev_score = scores[i-1]
+                        # print(prev_score, score)
+                        new_predictions.append(1 if score < (prev_score*(scoring_factor)) else 0)
 
-        # convert to strings so it can be used with the wd and pk metrics
-        pred_string = "".join(map(str,predictions))
-        true_string = "".join(map(str,true_labels))
+            # convert to strings so it can be used with the wd and pk metrics
+            pred_string = "".join(map(str,new_predictions))
+            true_string = "".join(map(str,true_labels))
 
-        # calculate all the metrics we will be storing
+            # calculate all the metrics we will be storing
 
-        print(pred_string)
-        print(true_string)
-        print(len(pred_string), len(true_string))
-        wd_score = windowdiff(pred_string, true_string, avg_k)
-        pk_score = pk(pred_string, true_string, avg_k)
-        tn, fp, fn, tp = confusion_matrix(true_labels, predictions).ravel()
-        precision, recall, f1, _ = precision_recall_fscore_support(
-            true_labels, predictions, average="micro"
-        )
-        proximity, _, _, _ = get_proximity(true_labels, predictions)
-
-        pks.append(pk_score)
-        wds.append(wd_score)
-        proximities.append(proximity)
-
-        # append all the data to an array before converting to a dataframe below
-        df_data.append(
-            [
-                avg_k,
-                tp,
-                fp,
-                tn,
-                fn,
-                precision,
-                recall,
-                f1,
-                pk_score,
-                wd_score,
-                proximity,
-            ]
-        )
-        # calculate lowest pred thresh and pk for summary printing
-        if (pk_score - proximity) < best_overall_score:
-            lowest_pk = pk_score
-            best_predictions = predictions
-            best_proximity = proximity
-            best_overall_score = pk_score - proximity
-
-        if experiment.print_metrics_summary:
-            print("pk score:", pk_score)
-            print("wd score:", wd_score)
-            print("proximity:", proximity)
-            print(
-                f"confusion: f1 [{f1}], tp [{tp}], fp [{fp}], tn [{tn}], fn [{fn}]"
+            # print(pred_string)
+            # print(true_string)
+            # print(len(scores), len(pred_string), len(true_string))
+            wd_score = windowdiff(pred_string, true_string, avg_k)
+            pk_score = pk(pred_string, true_string, avg_k)
+            tn, fp, fn, tp = confusion_matrix(true_labels, new_predictions).ravel()
+            precision, recall, f1, _ = precision_recall_fscore_support(
+                true_labels, new_predictions, average="micro"
             )
-            print("==========================")
+            proximity, _, _, _ = get_proximity(true_labels, new_predictions)
+
+            pks.append(pk_score)
+            wds.append(wd_score)
+            proximities.append(proximity)
+
+            # append all the data to an array before converting to a dataframe below
+            df_data.append(
+                [
+                    avg_k,
+                    tp,
+                    fp,
+                    tn,
+                    fn,
+                    precision,
+                    recall,
+                    f1,
+                    pk_score,
+                    wd_score,
+                    proximity,
+                ]
+            )
+            # calculate lowest pred thresh and pk for summary printing
+            if (pk_score - proximity) <= best_overall_score:
+                lowest_pk = pk_score
+                best_predictions = new_predictions
+                best_proximity = proximity
+                best_overall_score = pk_score - proximity
+                best_scoring_factor = scoring_factor
+
+            if experiment.print_metrics_summary:
+                print("pk score:", pk_score)
+                print("wd score:", wd_score)
+                print("proximity:", proximity)
+                print(
+                    f"confusion: f1 [{f1}], tp [{tp}], fp [{fp}], tn [{tn}], fn [{fn}]"
+                )
+                print("==========================")
 
         df_evaluation_set = pd.DataFrame(
             df_data,
@@ -200,13 +237,14 @@ class PredictByChainCountExperiment:
         # append data frame to CSV file
         df_evaluation_set.to_csv(evaluation_file, mode="a", index=False, header=hdr)
 
-        # if experiment.show_graphs:
-        #     display_pk_wd_proximity(curr_model_thresholds, pks, wds, proximities)
+        if experiment.show_graphs:
+            plot_file = "{}/plot.tex".format(evaluation_directory)
+            display_pk_wd_proximity(scoring_factors[self.type], pks, wds, proximities, file=plot_file)
 
         if experiment.print_predictions_summary:
             print("============= Predictions Summary =============")
             print(
-                f"best pk: {lowest_pk}, best prediction threshold: {lowest_pred_thresh}, proximity: {best_proximity}"
+                f"best pk: {lowest_pk}, best prediction threshold: {best_scoring_factor}, proximity: {best_proximity}"
             )
             print(f"P:{best_predictions}")
             print(f"R:{true_labels}")
@@ -253,16 +291,23 @@ class PredictByChainCountExperiment:
                 diverse_keywords=experiment.diverse_keywords,
                 similar_keywords=experiment.similar_keywords,
                 ablation=experiment.ablation,
+                scoring_factor=experiment.scoring_factor,
             )
 
-            logits = coherence.predict_by_chain_count(
+            experiment_prediction_type = coherence.predict_by_chain_count
+            if self.type == "chain_count":
+                experiment_prediction_type = coherence.predict_by_chain_count
+            elif self.type == "weighted_count":
+                experiment_prediction_type = coherence.predict_by_weighted_count
+
+            predictions, scores = experiment_prediction_type(
                 text_data=batch_segments_to_test,
                 max_tokens=128,
                 max_graph_depth=experiment.max_graph_depth,
                 batch_size=experiment.batch_size,
             )
 
-            self.log_predictions(experiment, logits, batch_labels_to_test)
+            self.log_predictions(experiment, predictions, scores, batch_labels_to_test)
 
             print(f"\nExperiment {i+1} - {experiment.experiment_hash} complete.")
             print("==============================================\n")
