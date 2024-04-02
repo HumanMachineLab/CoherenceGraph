@@ -14,6 +14,9 @@ from src.experimentation.prediction_thresholds import thresholds
 from src.experimentation.graphs import display_pk_wd_proximity
 
 from utils.metrics import windowdiff, pk, get_proximity
+from segeval.window.windowdiff import window_diff as segeval_windowdiff
+from segeval.window.pk import pk as segeval_pk
+from segeval.format import BoundaryFormat
 import tikzplotlib
 
 
@@ -28,7 +31,7 @@ experiment_set_hash = get_random_hash(
 
 scoring_factors = {
     "chain_count": [0.1, 0.2, 0.3, 0.4, 0.5, 1, 1.5, 2, 2.5, 3],
-    "weighted_count": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
+    "weighted_count": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.25, 1.5, 1.75, 2, 2.5]
 }
 
 
@@ -144,6 +147,8 @@ class Experiment:
             avg_k = len(true_labels) // (
                 true_labels.count(1) + 1
             )  # get avg segment size
+            avg_k = 1
+            print("average k:", avg_k)
 
             new_predictions = []
             # rebuild the predictions based on the scoring factors
@@ -172,8 +177,13 @@ class Experiment:
             # print(pred_string)
             # print(true_string)
             # print(len(scores), len(pred_string), len(true_string))
+
             wd_score = windowdiff(pred_string, true_string, avg_k)
             pk_score = pk(pred_string, true_string, avg_k)
+
+            # wd_score = float(segeval_windowdiff(pred_string, true_string, window_size=avg_k, boundary_format=BoundaryFormat.nltk))
+            # pk_score = float(segeval_pk(pred_string, true_string, window_size=avg_k, boundary_format=BoundaryFormat.nltk))
+            
             tn, fp, fn, tp = confusion_matrix(true_labels, new_predictions).ravel()
             precision, recall, f1, _ = precision_recall_fscore_support(
                 true_labels, new_predictions, average="micro"
