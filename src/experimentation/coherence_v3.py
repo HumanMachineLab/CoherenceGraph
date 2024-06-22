@@ -35,7 +35,7 @@ scoring_factors = {
 }
 
 
-supported_datasets = ["city", "disease", "clinical", "wiki", "fiction", "committee", "product", "academic", "wiki50k", "choi_3_5", "choi_3_11", "choi_6_8", "choi_9_11"]
+supported_datasets = ["city", "disease", "clinical", "ami", "icsi", "wiki", "fiction", "committee", "product", "academic", "wiki50k", "choi_3_5", "choi_3_11", "choi_6_8", "choi_9_11", "manifesto"]
 
 @dataclass
 class CoherenceExperiment:
@@ -52,7 +52,8 @@ class CoherenceExperiment:
     keyword_diversity: float = (
         0.0  # diversity value for mmr. the higher, the more diverse the keywords are.
     )
-
+    avg_k: int = -1 # override the k value used in pk and windowdiff. -1 will use half the segment size
+    
     diverse_keywords: bool = False
     similar_keywords: bool = True
     ablation: bool = False  # if set to True, remove the coherence map
@@ -144,10 +145,12 @@ class Experiment:
         wds = []
         proximities = []
         for scoring_factor in scoring_factors[self.type]:
-            avg_k = len(true_labels) // (
-                true_labels.count(1) + 1
-            )  # get avg segment size
-            avg_k = 1
+            if experiment.avg_k == -1:
+                avg_k = len(true_labels) // (
+                    true_labels.count(1) + 1
+                )  # get avg segment size
+            else:
+                avg_k = experiment.avg_k
             print("average k:", avg_k)
 
             new_predictions = []

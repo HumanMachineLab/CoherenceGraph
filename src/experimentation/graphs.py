@@ -21,10 +21,12 @@ def display_pk_wd_proximity(pred_thresholds, pk, wd, proximity, file=None):
     plt.legend()
     fig = plt.gcf()
     tikzplotlib_fix_ncols(fig)
-    plt.show()
+    # plt.show()
 
     if file is not None:
         # plt.grid(True)
         tikzplotlib.save(file)
+        plt.cla()
     else:
         plt.show()
+        plt.cla()

@@ -68,6 +68,80 @@ class RawData:
                         data.append(line)
         
         assert len(data) > 0, "data could not be imported"
+    
+    
+    def get_choi_data(self):
+        keys = ["3-5", "3-11", "6-8", "9-11"]
+        data = {}
+
+        for key in keys:
+            data_path = f"{config.root_path}/raw_data/choi/2/{key}"
+            data[key] = []
+            for filename in os.listdir(data_path):
+                f = os.path.join(data_path, filename)
+                # checking if it is a file
+                if os.path.isfile(f):
+                    with open(f, mode="r", encoding="utf-8") as f:
+                        for line in f:
+                            data[key].append(line)
+        
+            assert len(data[key]) > 0, "data could not be imported"
+
+        return data
+    
+    
+    def get_manifesto_data(self):
+        data_path = f"{config.root_path}/raw_data/manifesto"
+        data = []
+
+        for filename in os.listdir(data_path):
+            f = os.path.join(data_path, filename)
+            # checking if it is a file
+            if os.path.isfile(f):
+                with open(f, mode="r", encoding="utf-8") as f:
+                    for line in f:
+                        data.append(line)
+        
+        assert len(data) > 0, "data could not be imported"
+
+        return data
+    
+    def get_ami_data(self):
+        data_path = f"{config.root_path}/raw_data/ami"
+        data = []
+
+        for filename in os.listdir(data_path):
+            if filename == ".DS_Store": continue
+            f = os.path.join(data_path, filename)
+            # checking if it is a file
+            if os.path.isfile(f):
+                file = open(f)
+                new_data = json.load(file)
+                data.extend(new_data)
+                file.close()
+        
+        assert len(data) > 0, "data could not be imported"
+
+        return data
+    
+    def get_icsi_data(self):
+        data_path = f"{config.root_path}/raw_data/icsi"
+        icsi_data = []
+
+        for filename in os.listdir(data_path):
+            f = os.path.join(data_path, filename)
+            if filename == ".DS_Store": continue
+            # checking if it is a file
+            if os.path.isfile(f):
+                with open(f, 'rb') as f:
+                    data = f.read()
+                    data_str = data.decode("utf-8", errors='ignore')
+                    new_data = json.loads(data_str)
+                    icsi_data.extend(new_data)
+        
+        assert len(icsi_data) > 0, "data could not be imported"
+
+        return icsi_data
 
 
 class DatasetMixin:
