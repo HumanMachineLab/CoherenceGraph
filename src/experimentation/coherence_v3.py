@@ -31,7 +31,7 @@ experiment_set_hash = get_random_hash(
 
 scoring_factors = {
     "chain_count": [0.1, 0.2, 0.3, 0.4, 0.5, 1, 1.5, 2, 2.5, 3],
-    "weighted_count": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.25, 1.5, 1.75, 2, 2.5]
+    "weighted_count": [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
 }
 
 
@@ -251,7 +251,7 @@ class Experiment:
         df_evaluation_set.to_csv(evaluation_file, mode="a", index=False, header=hdr)
 
         if experiment.show_graphs:
-            plot_file = "{}/plot.tex".format(evaluation_directory)
+            plot_file = "{}/plot.pdf".format(evaluation_directory)
             display_pk_wd_proximity(scoring_factors[self.type], pks, wds, proximities, file=plot_file)
 
         if experiment.print_predictions_summary:

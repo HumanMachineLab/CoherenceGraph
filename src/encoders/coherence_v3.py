@@ -13,6 +13,7 @@ supported_models = [
     "bert-base-uncased",  # default
     "roberta-base",
     "sentence-transformers/all-MiniLM-L6-v2",
+    "sentence-transformers/all-MiniLM-L12-v2",
 ]
 
 
